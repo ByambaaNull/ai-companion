@@ -1,0 +1,86 @@
+# =============================================================================
+# AI Companion — requirements.txt
+# Python 3.11+  |  Windows 11  |  NVIDIA RTX 3050 Ti (4 GB VRAM)
+# =============================================================================
+#
+# INSTALL ORDER (important — torch must come first with CUDA build):
+#
+#   Step 1 — PyTorch with CUDA 12.1 (matches driver ≥ 525):
+#   pip install torch==2.3.1+cu121 torchaudio==2.3.1+cu121 --extra-index-url https://download.pytorch.org/whl/cu121
+#
+#   Step 2 — Everything else:
+#   pip install -r requirements.txt
+#
+# =============================================================================
+
+# ─── Core async / HTTP ────────────────────────────────────────────────────────
+httpx>=0.27.0
+aiofiles>=23.2.1
+
+# ─── LLM — Ollama Python client ──────────────────────────────────────────────
+ollama>=0.3.3
+
+# ─── STT — faster-whisper ─────────────────────────────────────────────────────
+faster-whisper>=1.0.3
+# ctranslate2 is pulled as a dependency of faster-whisper — no explicit pin needed
+
+# ─── Wake word — openWakeWord ─────────────────────────────────────────────────
+openwakeword>=0.6.0
+
+# ─── Hotkey activation ────────────────────────────────────────────────────────
+keyboard>=0.13.5
+
+# ─── Audio I/O — sounddevice (bundles PortAudio DLLs on Windows) ─────────────
+sounddevice>=0.4.7
+soundfile>=0.12.1
+numpy>=1.26.4
+
+# ─── TTS — Piper (Python package, CPU-only, 0 VRAM) ─────────────────────────
+# piper-tts is a pip package (GPL-3.0). Install like any other package.
+# Voice models are downloaded separately via:
+#   python -m piper.download_voices en_US-lessac-medium
+# OR automatically by: python bootstrap.py
+piper-tts>=1.4.2
+onnxruntime>=1.18.0     # CPU inference backend for Piper (no VRAM cost)
+
+# ─── Japanese TTS — kokoro-onnx ──────────────────────────────────────────────
+# Pure-Python ONNX-based TTS with a male Japanese voice (jm_kumo).
+# Uses espeakng_loader (bundled DLL, no system install needed) for JP G2P.
+# Model files (~115 MB) are downloaded by bootstrap.py to models/kokoro/*.
+kokoro-onnx==0.4.7
+pykakasi>=2.2.1          # kanji -> hiragana pre-processing (prevents espeak reading kanji as Chinese)
+
+# ─── RVC v2 voice conversion ──────────────────────────────────────────────────
+# rvc-python provides a clean Python API around RVC v2
+rvc-python>=0.1.5
+# Dependencies pulled by rvc-python: fairseq, torchcrepe, praat-parselmouth, etc.
+# If rvc-python is unavailable, see bootstrap.py for repo-clone fallback.
+
+# ─── Memory — mem0 + ChromaDB + sentence-transformers ────────────────────────
+# CRITICAL: always pass MEM0_CONFIG from config.py — never use default (hits OpenAI)
+mem0ai>=0.1.29
+chromadb>=0.5.3
+sentence-transformers>=3.0.1
+
+# ─── Desktop control ──────────────────────────────────────────────────────────
+pyautogui>=0.9.54
+pyperclip>=1.9.0         # clipboard paste for type_text (Unicode support)
+Pillow>=10.4.0
+psutil>=6.0.0
+
+# ─── Screen awareness (desktop character) ─────────────────────────────────────
+mss>=9.0.1               # fast cross-platform screen capture
+
+# ─── Music — yt-dlp (downloader) ─────────────────────────────────────────────
+# mpv must be installed separately and on PATH:
+#   https://mpv.io/installation/  (Windows: choco install mpv  OR  scoop install mpv)
+yt-dlp>=2024.8.6
+
+# ─── mpv IPC named pipe on Windows ───────────────────────────────────────────
+pywin32>=306
+
+# ─── PyTorch (declared here for reference — install via Step 1 above) ─────────
+# Your driver: CUDA 13.2 — supports cu124 wheels and above
+# torch>=2.4 required by transformers (sentence-transformers / mem0 embedder)
+#   pip install torch==2.6.0+cu124 torchaudio==2.6.0+cu124 --extra-index-url https://download.pytorch.org/whl/cu124
+# torch>=2.6.0    # installed with CUDA build via --extra-index-url

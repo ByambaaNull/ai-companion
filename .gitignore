@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Large model binaries
+models/
+piper/
+
+# Data and cache
+data/memory_db/
+data/temp/
+data/music_cache/
+
+# Keep data directory structure
+!data/
+!data/favourites.json
+
+# Assets - keep sprites folder if small, exclude if large
+# assets/sprites/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
