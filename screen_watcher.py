@@ -1,17 +1,12 @@
 """
-screen_watcher.py — Periodic screen capture + vision LLM analysis.
+screen_watcher.py — On-demand + periodic screen capture with vision LLM analysis.
 
-Pipeline every SCREEN_WATCH_INTERVAL seconds:
-    mss screen capture → JPEG bytes → Ollama vision LLM (moondream2/llava)
-    → JSON scene description → emits SceneEvent via asyncio.Queue
+The `look_now()` coroutine powers the `look_at_screen` action: it captures the
+screen and returns a detailed description via the GitHub Models vision API.
 
-The scene event is consumed by desktop_character.py to drive reactions.
-Runs as a background asyncio Task — never blocks the agent loop.
-
-Vision model requirements:
-    ollama pull moondream  (1.8 GB, fast, good for scene description)
-    OR
-    ollama pull llava:7b   (4.2 GB, more accurate, needs more VRAM)
+The `ScreenWatcher` class additionally supports a periodic ambient-watch loop
+(every SCREEN_WATCH_INTERVAL seconds) that emits SceneEvents. It is provided for
+opt-in use; the agent currently only wires up `look_now()`.
 """
 
 from __future__ import annotations
@@ -50,6 +45,13 @@ _VISION_PROMPT = (
     "TAGS: youtube, anime, fight, action"
 )
 
+_LOOK_PROMPT = (
+    "Look at this screenshot carefully. Describe in 2-3 sentences exactly what you see: "
+    "what application is open, what content is visible, what the user appears to be doing. "
+    "Be specific — mention visible text, names, UI elements, and anything notable. "
+    "Do NOT output TAGS. Just a natural, detailed description."
+)
+
 
 class ScreenWatcher:
     """
@@ -66,6 +68,7 @@ class ScreenWatcher:
         self._queue: asyncio.Queue[SceneEvent] = asyncio.Queue(maxsize=3)
         self._last_tags: list[str] = []
         self._running = False
+        self._backoff_until: float = 0.0  # epoch seconds; skip vision calls until then
 
     # ─── Public ──────────────────────────────────────────────────────────────
 
@@ -75,7 +78,7 @@ class ScreenWatcher:
         log.info(
             "ScreenWatcher starting (interval=%ds, model=%s)",
             config.SCREEN_WATCH_INTERVAL,
-            config.VISION_MODEL,
+            config.GITHUB_GPT_MODEL,
         )
         while self._running:
             try:
@@ -101,6 +104,12 @@ class ScreenWatcher:
 
     async def _tick(self) -> None:
         """Capture screen → vision LLM → push SceneEvent."""
+        # Respect 429 backoff
+        if time.time() < self._backoff_until:
+            remaining = self._backoff_until - time.time()
+            log.debug("ScreenWatcher: rate-limit backoff — %.0fs remaining", remaining)
+            return
+
         jpeg_b64 = await asyncio.get_running_loop().run_in_executor(
             None, self._capture_screen
         )
@@ -138,8 +147,8 @@ class ScreenWatcher:
                 monitor = sct.monitors[1]  # primary monitor
                 raw = sct.grab(monitor)
                 img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
-                # Downscale for faster LLM processing — 1024px wide max
-                max_w = 1024
+                # Downscale for faster LLM processing — 512px wide for periodic watch
+                max_w = 512
                 if img.width > max_w:
                     ratio = max_w / img.width
                     img = img.resize(
@@ -147,7 +156,7 @@ class ScreenWatcher:
                         Image.LANCZOS,
                     )
                 buf = BytesIO()
-                img.save(buf, format="JPEG", quality=75)
+                img.save(buf, format="JPEG", quality=50)
                 return base64.b64encode(buf.getvalue()).decode("ascii")
         except ImportError as exc:
             log.error("Missing dependency for screen capture: %s — pip install mss pillow", exc)
@@ -157,36 +166,44 @@ class ScreenWatcher:
             return None
 
     async def _query_vision_llm(self, jpeg_b64: str) -> SceneEvent | None:
-        """Send screenshot to Ollama vision model, parse response."""
+        """Send screenshot to GitHub Models vision API, parse response."""
         payload = {
-            "model": config.VISION_MODEL,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": _VISION_PROMPT,
-                    "images": [jpeg_b64],
-                }
-            ],
+            "model": config.GITHUB_GPT_MODEL,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": _VISION_PROMPT},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:image/jpeg;base64,{jpeg_b64}",
+                        "detail": "low",
+                    }},
+                ],
+            }],
             "stream": False,
-            "options": {"temperature": 0.1, "num_ctx": 1024},
+            "temperature": 0.1,
+            "max_tokens": 64,
         }
-
-        url = f"{config.OLLAMA_BASE_URL}/api/chat"
+        headers = {
+            "Authorization": f"Bearer {config.GITHUB_API_KEY}",
+            "Content-Type":  "application/json",
+            "Accept":        "application/json",
+        }
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(url, json=payload)
-                if resp.status_code != 200:
+                resp = await client.post(config.GITHUB_API_URL, json=payload, headers=headers)
+                if resp.status_code == 429:
+                    # Parse Retry-After if present, else back off for 60 s
+                    retry_after = float(resp.headers.get("Retry-After", 60))
+                    self._backoff_until = time.time() + retry_after
                     log.warning(
-                        "ScreenWatcher: vision LLM HTTP %d — %s",
-                        resp.status_code,
-                        resp.text[:200],
+                        "ScreenWatcher: HTTP 429 — backing off for %.0fs", retry_after
                     )
                     return None
-                data = resp.json()
-                raw_text = data.get("message", {}).get("content", "").strip()
-        except httpx.ConnectError:
-            log.warning("ScreenWatcher: Ollama not reachable")
-            return None
+                if resp.status_code != 200:
+                    log.warning("ScreenWatcher: HTTP %d — %s", resp.status_code, resp.text[:200])
+                    return None
+                choices = resp.json().get("choices", [])
+                raw_text = choices[0].get("message", {}).get("content", "").strip() if choices else ""
         except Exception as exc:
             log.warning("ScreenWatcher: vision LLM error: %r", exc)
             return None
@@ -210,3 +227,78 @@ class ScreenWatcher:
 
         description = " ".join(desc_lines).strip() or raw[:120]
         return SceneEvent(description=description, tags=tags, raw=raw)
+
+
+# ─── On-demand screen look (used by look_at_screen action) ───────────────────
+
+async def look_now() -> str:
+    """
+    Instantly capture the screen and return a detailed description via vision LLM.
+
+    Designed for the `look_at_screen` action — gives the companion genuine
+    real-time sight on request ("what's on my screen?", "read that for me", etc.).
+    """
+    # Vision works with ANY configured key (Groq / Gemini / GitHub) — bail early
+    # with a helpful message if none is set, rather than sending an empty Bearer.
+    if not config.VISION_PROVIDERS:
+        return ("Screen vision needs an API key — add Groq, Gemini, or a GitHub "
+                "token in Settings → API keys, then try again.")
+
+    loop = asyncio.get_running_loop()
+
+    # Capture in thread (mss is not async)
+    def _capture() -> str | None:
+        try:
+            import mss
+            from PIL import Image
+            with mss.mss() as sct:
+                raw = sct.grab(sct.monitors[1])
+                img = Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
+                if img.width > 1280:
+                    ratio = 1280 / img.width
+                    img = img.resize((1280, int(img.height * ratio)), Image.LANCZOS)
+                buf = BytesIO()
+                img.save(buf, format="JPEG", quality=80)
+                return base64.b64encode(buf.getvalue()).decode("ascii")
+        except Exception as exc:
+            log.error("look_now capture failed: %s", exc)
+            return None
+
+    jpeg_b64 = await loop.run_in_executor(None, _capture)
+    if jpeg_b64 is None:
+        return "I couldn't capture the screen."
+
+    content = [
+        {"type": "text", "text": _LOOK_PROMPT},
+        {"type": "image_url", "image_url": {
+            "url": f"data:image/jpeg;base64,{jpeg_b64}",
+            "detail": "high",
+        }},
+    ]
+    # Try each configured provider's vision model; fall over on failure.
+    for prov in config.VISION_PROVIDERS:
+        payload = {
+            "model": prov["model"],
+            "messages": [{"role": "user", "content": content}],
+            "stream": False,
+            "temperature": 0.2,
+            "max_tokens": 256,
+        }
+        headers = {
+            "Authorization": f"Bearer {prov['key']}",
+            "Content-Type":  "application/json",
+            "Accept":        "application/json",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(prov["url"], json=payload, headers=headers)
+                resp.raise_for_status()
+                choices = resp.json().get("choices", [])
+                text = (choices[0].get("message", {}).get("content", "").strip()
+                        if choices else "")
+                if text:
+                    return text
+        except Exception as exc:
+            log.warning("look_now via %s failed: %s — trying next", prov["name"], exc)
+            continue
+    return "I couldn't analyse the screen right now."

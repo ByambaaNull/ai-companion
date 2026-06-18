@@ -1,0 +1,81 @@
+<!-- @dsCard group="Components" name="Buttons" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Buttons · AI Companion</title>
+<style>
+  :root{
+    --bg:#06070c;
+    --bg-grad:
+      radial-gradient(700px 460px at 12% -12%, rgba(124,108,255,.28), transparent 60%),
+      radial-gradient(620px 460px at 104% 8%, rgba(196,98,234,.20), transparent 58%);
+    --surface:rgba(30,33,48,.52);
+    --surface-2:rgba(255,255,255,.05);
+    --surface-3:rgba(255,255,255,.10);
+    --border:rgba(255,255,255,.10);
+    --border-strong:rgba(255,255,255,.18);
+    --text:#eceefb; --text-2:#a8b0c9; --muted:#6f7796;
+    --accent:#8b8cff; --accent-soft:rgba(139,140,255,.16);
+    --accent-grad:linear-gradient(135deg,#8b8cff,#c062ea);
+    --danger:#fb7185;
+    --glow:0 10px 34px rgba(139,140,255,.42);
+    --blur:saturate(150%) blur(18px);
+    --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);color:var(--text);background:var(--bg-grad),var(--bg);
+       background-attachment:fixed;min-height:100vh;padding:30px}
+  h1{font-size:18px;font-weight:650;margin-bottom:4px}
+  .sub{color:var(--text-2);font-size:13px;margin-bottom:22px}
+  .panel{backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);background:var(--surface);
+         border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:16px;
+         box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  button{font:inherit;cursor:pointer;border:none}
+  .btn{height:38px;border-radius:10px;color:var(--text);background:var(--surface-2);
+       border:1px solid var(--border);padding:0 16px;font-size:13px;transition:.15s}
+  .btn:hover{background:var(--surface-3);border-color:var(--border-strong)}
+  .btn.primary{background:var(--accent-grad);color:#fff;border-color:transparent;box-shadow:var(--glow)}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent}
+  .btn.danger{color:var(--danger);border-color:rgba(251,113,133,.4)}
+  .btn.icon{width:38px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+  .send{width:38px;height:38px;border-radius:11px;background:var(--accent-grad);color:#fff;
+        display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--glow)}
+  .chip{padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);
+        color:var(--text-2);font-size:12.5px;cursor:pointer}
+  .chip.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  svg{display:block}
+</style>
+</head>
+<body>
+  <h1>Buttons</h1>
+  <div class="sub">Primary uses the accent gradient + glow; everything else is calm glass.</div>
+
+  <div class="panel">
+    <div class="lbl">Variants</div>
+    <div class="row">
+      <button class="btn primary">Save settings</button>
+      <button class="btn">Daily brief</button>
+      <button class="btn ghost">Cancel</button>
+      <button class="btn danger">Delete</button>
+      <button class="btn icon" aria-label="Theme"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <span class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="lbl">Filter chips</div>
+    <div class="row">
+      <button class="chip active">All</button>
+      <button class="chip">Liked</button>
+      <button class="chip">Favourites</button>
+      <button class="chip">Downloaded</button>
+      <button class="chip">Focus</button>
+    </div>
+  </div>
+</body>
+</html>

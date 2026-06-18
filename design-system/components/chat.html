@@ -1,0 +1,76 @@
+<!-- @dsCard group="Components" name="Chat thread" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chat · AI Companion</title>
+<style>
+  :root{
+    --bg:#06070c;
+    --bg-grad:
+      radial-gradient(700px 460px at 12% -12%, rgba(124,108,255,.28), transparent 60%),
+      radial-gradient(620px 460px at 104% 8%, rgba(196,98,234,.20), transparent 58%);
+    --dock:rgba(14,16,26,.55);
+    --surface:rgba(30,33,48,.55);
+    --surface-2:rgba(255,255,255,.05);
+    --border:rgba(255,255,255,.10);
+    --text:#eceefb; --text-2:#a8b0c9; --muted:#6f7796;
+    --accent:#8b8cff; --accent-soft:rgba(139,140,255,.16);
+    --accent-grad:linear-gradient(135deg,#8b8cff,#c062ea);
+    --user-bub:linear-gradient(135deg,#7c6cff,#c062ea);
+    --glow:0 10px 34px rgba(139,140,255,.42);
+    --blur:saturate(150%) blur(18px);
+    --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);color:var(--text);background:var(--bg-grad),var(--bg);
+       background-attachment:fixed;min-height:100vh;padding:30px;display:flex;justify-content:center}
+  .dock{width:380px;border-radius:18px;background:var(--dock);border:1px solid var(--border);
+        backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);overflow:hidden;
+        box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .head{display:flex;align-items:center;gap:11px;padding:14px 18px;border-bottom:1px solid var(--border)}
+  .avatar{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);color:var(--accent);
+          display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--border)}
+  .title{font-size:14px;font-weight:650}
+  .st{font-size:11.5px;color:var(--text-2)}
+  .thread{padding:18px 16px;display:flex;flex-direction:column;gap:16px}
+  .row{display:flex;flex-direction:column}
+  .row.user{align-items:flex-end}
+  .who{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:650;color:var(--text-2);
+       margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+  .who .spark{color:var(--accent)}
+  .bot .msg{line-height:1.6;max-width:100%}
+  .user .msg{max-width:86%;background:var(--user-bub);color:#f4f3ff;border-radius:14px;
+             border-bottom-right-radius:5px;padding:10px 13px;line-height:1.55;box-shadow:var(--glow)}
+  .meta{font-size:10.5px;color:var(--muted);margin-top:5px}
+  .input{margin:0 14px 14px;display:flex;align-items:center;gap:8px;background:var(--surface);
+         border:1px solid var(--border);border-radius:13px;padding:8px 8px 8px 13px}
+  .input input{flex:1;border:none;background:none;color:var(--text);font:inherit;outline:none}
+  .input input::placeholder{color:var(--muted)}
+  .send{width:34px;height:34px;border-radius:10px;background:var(--accent-grad);color:#fff;
+        display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:var(--glow)}
+  svg{display:block}
+</style>
+</head>
+<body>
+  <div class="dock">
+    <div class="head">
+      <div class="avatar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.9 5.8L20 8l-4.7 3.6L17 18l-5-3.5L7 18l1.7-6.4L4 8l6.1-.2z"/></svg></div>
+      <div><div class="title">Companion</div><div class="st">thinking</div></div>
+    </div>
+    <div class="thread">
+      <div class="row user"><div class="msg">Give me a quick brief for today</div><div class="meta">9:41 AM</div></div>
+      <div class="row bot">
+        <div class="who"><span class="spark"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.8L20 8l-4.7 3.6L17 18l-5-3.5L7 18l1.7-6.4L4 8l6.1-.2z"/></svg></span>Companion</div>
+        <div class="msg">You have <b>3 unread</b> emails and one meeting at 2 PM. Downloads are tidy. Want me to draft replies?</div>
+        <div class="meta">9:41 AM</div>
+      </div>
+    </div>
+    <div class="input">
+      <input type="text" placeholder="Message Companion">
+      <span class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span>
+    </div>
+  </div>
+</body>
+</html>

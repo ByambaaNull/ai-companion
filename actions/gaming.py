@@ -27,6 +27,8 @@ import urllib.parse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import config
+
 if TYPE_CHECKING:
     from tts_rvc import TTSEngine
 
@@ -35,36 +37,86 @@ log = logging.getLogger(__name__)
 # ─── Steam App IDs ─────────────────────────────────────────────────────────────
 
 STEAM_APP_IDS: dict[str, str] = {
-    "cs2":                   "730",
-    "counter-strike 2":      "730",
-    "counter strike 2":      "730",
-    "csgo":                  "730",
-    "cs go":                 "730",
-    "dota 2":                "570",
-    "dota2":                 "570",
-    "dota":                  "570",
-    "tf2":                   "440",
-    "team fortress 2":       "440",
-    "rust":                  "252490",
-    "valheim":               "892970",
-    "elden ring":            "1245620",
-    "cyberpunk 2077":        "1091500",
-    "cyberpunk":             "1091500",
-    "gta 5":                 "271590",
-    "gta v":                 "271590",
-    "grand theft auto 5":    "271590",
-    "grand theft auto v":    "271590",
-    "apex legends":          "1172470",
-    "apex":                  "1172470",
-    "pubg":                  "578080",
-    "warframe":              "230410",
-    "destiny 2":             "1085660",
-    "rainbow six siege":     "359550",
-    "r6":                    "359550",
-    "rocket league":         "252950",
+    "cs2":                        "730",
+    "counter-strike 2":           "730",
+    "counter strike 2":           "730",
+    "csgo":                       "730",
+    "cs go":                      "730",
+    "dota 2":                     "570",
+    "dota2":                      "570",
+    "dota":                       "570",
+    "tf2":                        "440",
+    "team fortress 2":            "440",
+    "rust":                       "252490",
+    "valheim":                    "892970",
+    "elden ring":                 "1245620",
+    "cyberpunk 2077":             "1091500",
+    "cyberpunk":                  "1091500",
+    "gta 5":                      "271590",
+    "gta v":                      "271590",
+    "grand theft auto 5":         "271590",
+    "grand theft auto v":         "271590",
+    "apex legends":               "1172470",
+    "apex":                       "1172470",
+    "pubg":                       "578080",
+    "warframe":                   "230410",
+    "destiny 2":                  "1085660",
+    "rainbow six siege":          "359550",
+    "r6":                         "359550",
+    "rocket league":              "252950",
+    # Strategy / TW
+    "total war warhammer 3":      "1142710",
+    "total war warhammer":        "364360",
+    "total war warhammer 2":      "594570",
+    "warhammer 3":                "1142710",
+    "warhammer 2":                "594570",
+    "total war troy":             "1099410",
+    "troy":                       "1099410",
+    "total war three kingdoms":   "779340",
+    "three kingdoms":             "779340",
+    "total war pharaoh":          "1937780",
+    "pharaoh":                    "1937780",
+    "total war rome remastered":  "885970",
+    "total war attila":           "325610",
+    "attila":                     "325610",
+    "total war medieval 2":       "4700",
+    # Roguelikes
+    "slay the spire":             "646570",
+    "slay the spire 2":           "2483220",
+    "sts2":                       "2483220",
+    "sts":                        "646570",
+    "hades":                      "1145360",
+    "hades 2":                    "1145370",
+    "dead cells":                 "588650",
+    "vampire survivors":          "1794680",
+    # Other popular
+    "stardew valley":             "413150",
+    "stardew":                    "413150",
+    "satisfactory":               "526870",
+    "factorio":                   "427520",
+    "rimworld":                   "294100",
+    "baldur's gate 3":            "1086940",
+    "bg3":                        "1086940",
+    "divinity original sin 2":    "435150",
+    "dos2":                       "435150",
+    "monster hunter world":       "582010",
+    "mhw":                        "582010",
+    "dark souls 3":               "374320",
+    "ds3":                        "374320",
+    "sekiro":                     "814380",
+    "hollow knight":              "367520",
+    "terraria":                   "105600",
+    "minecraft":                  "1672970",
+    "among us":                   "945360",
+    "fall guys":                  "1097150",
+    "the forest":                 "242760",
+    "sons of the forest":         "1326470",
+    "palworld":                   "1623730",
+    "enshrouded":                 "1203620",
 }
 
 _STEAM_PATHS: list[Path] = [
+    Path(config.STEAM_EXECUTABLE),
     Path(r"C:\Program Files (x86)\Steam\steam.exe"),
     Path(r"C:\Program Files\Steam\steam.exe"),
 ]
@@ -135,11 +187,10 @@ def launch_game(name: str) -> str:
 # ─── play_video ────────────────────────────────────────────────────────────────
 
 def play_video(query: str) -> str:
-    """Open a YouTube search for the given query in the browser."""
-    from actions.browser import open_browser
-    q = urllib.parse.quote(query.strip())
-    url = f"https://www.youtube.com/results?search_query={q}"
-    return open_browser(url)
+    """Find the best YouTube video for query and open it in Chrome."""
+    from actions.browser import open_youtube
+    open_youtube(query.strip())
+    return ""
 
 
 # ─── press_key ─────────────────────────────────────────────────────────────────
@@ -272,3 +323,44 @@ def cancel_accept_watcher() -> str:
         _watcher_task.cancel()
         return "Accept watcher cancelled."
     return "No accept watcher is running."
+
+
+# ─── steam_search ─────────────────────────────────────────────────────────────
+
+def steam_search(query: str) -> str:
+    """
+    Search the Steam store API for games matching *query*.
+    Returns a text summary of up to 5 results with names, app IDs, and prices.
+    No API key required — uses the public Steam store search endpoint.
+    """
+    import json
+    import urllib.request
+
+    endpoint = (
+        "https://store.steampowered.com/api/storesearch/"
+        f"?term={urllib.parse.quote(query)}&l=english&cc=US"
+    )
+    try:
+        req = urllib.request.Request(endpoint, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read())
+    except Exception as exc:
+        log.warning("Steam store search failed: %s", exc)
+        return f"Steam search failed: {exc}"
+
+    items = data.get("items", [])[:5]
+    if not items:
+        return f"No Steam games found for '{query}'."
+
+    lines = [f"[Steam search: {query}]"]
+    for item in items:
+        name   = item.get("name", "Unknown")
+        app_id = item.get("id", "")
+        price  = item.get("price", {})
+        if price:
+            price_str = price.get("final_formatted") or "Free"
+        else:
+            price_str = "Free / N/A"
+        lines.append(f"- {name}  (App {app_id})  {price_str}")
+        lines.append(f"  https://store.steampowered.com/app/{app_id}/")
+    return "\n".join(lines)

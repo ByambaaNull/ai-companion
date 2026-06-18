@@ -1,10 +1,10 @@
 """
-wake_word.py — Keyboard hotkey activation for the Gojo AI companion.
+wake_word.py — Keyboard hotkey activation for the AI companion.
 
 No microphone always-on, no voice detection, no extra models.
 
 Hotkeys (configurable in config.py):
-    HOTKEY_ACTIVATE  (default Ctrl+Shift+G) — wake Gojo, he listens once
+    HOTKEY_ACTIVATE  (default Ctrl+Shift+G) — wake the assistant, it listens once
     HOTKEY_QUIT      (default Ctrl+Shift+Q) — shut the agent down cleanly
 
 Interface:
@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 
 class HotkeyActivator:
     """
-    Activates Gojo on a global keyboard hotkey press.
+    Activates the assistant on a global keyboard hotkey press.
 
     HOTKEY_ACTIVATE  (default Ctrl+Shift+G) — triggers one conversation turn
     HOTKEY_QUIT      (default Ctrl+Shift+Q) — shuts the agent down cleanly

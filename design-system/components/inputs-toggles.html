@@ -1,0 +1,73 @@
+<!-- @dsCard group="Components" name="Inputs & toggles" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inputs & toggles · AI Companion</title>
+<style>
+  :root{
+    --bg:#06070c;
+    --bg-grad:
+      radial-gradient(700px 460px at 12% -12%, rgba(124,108,255,.28), transparent 60%),
+      radial-gradient(620px 460px at 104% 8%, rgba(196,98,234,.20), transparent 58%);
+    --surface:rgba(30,33,48,.52);
+    --surface-2:rgba(255,255,255,.05);
+    --surface-3:rgba(255,255,255,.10);
+    --border:rgba(255,255,255,.10);
+    --border-strong:rgba(255,255,255,.18);
+    --text:#eceefb; --text-2:#a8b0c9; --muted:#6f7796;
+    --accent:#8b8cff; --accent-soft:rgba(139,140,255,.16);
+    --blur:saturate(150%) blur(18px);
+    --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);color:var(--text);background:var(--bg-grad),var(--bg);
+       background-attachment:fixed;min-height:100vh;padding:30px}
+  h1{font-size:18px;font-weight:650;margin-bottom:18px}
+  .panel{backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);background:var(--surface);
+         border:1px solid var(--border);border-radius:16px;padding:8px 20px 18px;max-width:520px;
+         box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .frow{display:flex;align-items:center;justify-content:space-between;gap:16px;
+        padding:14px 0;border-top:1px solid var(--border)}
+  .frow:first-child{border-top:none}
+  label{font-size:13.5px}
+  .sub{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+  input[type=text],input[type=password],select{background:var(--surface-2);color:var(--text);
+    border:1px solid var(--border);border-radius:9px;padding:9px 11px;font:inherit;font-size:13px;
+    width:230px;outline:none;transition:.15s}
+  input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .search{display:flex;align-items:center;gap:9px;background:var(--surface-2);border:1px solid var(--border);
+          border-radius:10px;padding:0 12px;height:40px;width:100%;margin-bottom:8px}
+  .search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .search input{border:none;background:none;width:100%;color:var(--text);font:inherit;outline:none}
+  .search svg{color:var(--muted)}
+  .switch{position:relative;width:42px;height:23px;flex-shrink:0}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;border-radius:23px;background:var(--surface-3);
+          border:1px solid var(--border-strong);transition:.18s}
+  .slider:before{content:"";position:absolute;width:17px;height:17px;border-radius:50%;left:2px;top:2px;
+                 background:#fff;transition:.18s}
+  .switch input:checked+.slider{background:linear-gradient(135deg,#8b8cff,#c062ea);border-color:transparent}
+  .switch input:checked+.slider:before{transform:translateX(19px)}
+</style>
+</head>
+<body>
+  <h1>Inputs &amp; toggles</h1>
+  <div class="panel">
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" placeholder="Search your library" value="weightless">
+    </div>
+    <div class="frow"><label>Assistant name</label><input type="text" value="Companion"></div>
+    <div class="frow"><label>Personality<span class="sub">Professional keeps replies neutral.</span></label>
+      <select><option>Fun character</option><option>Professional</option></select></div>
+    <div class="frow"><label>Groq API key<span class="sub">Fast primary model.</span></label>
+      <input type="password" value="************"></div>
+    <div class="frow"><label>Speak replies aloud<span class="sub">Used for voice turns.</span></label>
+      <label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+    <div class="frow"><label>Custom voice (RVC)<span class="sub">Optional GPU voice conversion.</span></label>
+      <label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+  </div>
+</body>
+</html>

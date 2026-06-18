@@ -43,6 +43,10 @@ from config import (
 
 log = logging.getLogger(__name__)
 
+# Set by assistant_gui.py before Qt initialises to avoid ctranslate2/Qt GPU conflict.
+# WhisperTranscriber._load_model() will use this if available.
+_preloaded_model = None
+
 
 class WhisperTranscriber:
     """
@@ -65,7 +69,14 @@ class WhisperTranscriber:
     # ─── Model management ─────────────────────────────────────────────────────
 
     def _load_model(self) -> None:
-        """Load faster-whisper. Falls back to CPU int8 on CUDA OOM."""
+        """Load faster-whisper. Uses pre-loaded model if available."""
+        global _preloaded_model
+        if _preloaded_model is not None:
+            self._model = _preloaded_model
+            _preloaded_model = None
+            log.info("Whisper model re-used from pre-load ✓")
+            return
+
         from faster_whisper import WhisperModel
 
         try:

@@ -1,0 +1,65 @@
+<!-- @dsCard group="Components" name="Badges & menu" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Badges & menu · AI Companion</title>
+<style>
+  :root{
+    --bg:#06070c;
+    --bg-grad:
+      radial-gradient(700px 460px at 12% -12%, rgba(124,108,255,.28), transparent 60%),
+      radial-gradient(620px 460px at 104% 8%, rgba(196,98,234,.20), transparent 58%);
+    --surface:rgba(30,33,48,.55);
+    --surface-2:rgba(255,255,255,.05);
+    --border:rgba(255,255,255,.10);
+    --text:#eceefb; --text-2:#a8b0c9; --muted:#6f7796;
+    --accent:#8b8cff; --good:#4ade80; --warn:#fbbf24; --danger:#fb7185;
+    --blur:saturate(150%) blur(18px);
+    --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);color:var(--text);background:var(--bg-grad),var(--bg);
+       background-attachment:fixed;min-height:100vh;padding:30px;display:flex;gap:30px;flex-wrap:wrap}
+  .col{flex:1;min-width:240px}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px}
+  .job{backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);background:var(--surface);
+       border:1px solid var(--border);border-radius:16px;padding:6px 18px;box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .jrow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0;border-top:1px solid var(--border)}
+  .jrow:first-child{border-top:none}
+  .name{font-size:13.5px;font-weight:550}
+  .meta{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+  .badge.on{background:rgba(74,222,128,.16);color:var(--good)}
+  .badge.due{background:rgba(251,191,36,.18);color:var(--warn)}
+  .menu{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:6px;width:220px;
+        backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);box-shadow:0 30px 72px rgba(0,0,0,.62)}
+  .mi{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;font-size:13px;cursor:pointer}
+  .mi:hover{background:var(--surface-2)}
+  .mi.danger{color:var(--danger)}
+  .mi .arrow{margin-left:auto;color:var(--muted)}
+  .sep{height:1px;background:var(--border);margin:5px 4px}
+  svg{display:block}
+</style>
+</head>
+<body>
+  <div class="col">
+    <div class="lbl">Automation jobs &amp; badges</div>
+    <div class="job">
+      <div class="jrow"><div><div class="name">Inbox sweep</div><div class="meta">Every 30 min when idle · Next 11:20</div></div><span class="badge on">On</span></div>
+      <div class="jrow"><div><div class="name">Downloads organizer</div><div class="meta">Preview-only every 6 h · Due now</div></div><span class="badge due">Due</span></div>
+      <div class="jrow"><div><div class="name">Morning brief</div><div class="meta">Waiting for settings</div></div><span class="badge">Off</span></div>
+    </div>
+  </div>
+  <div class="col" style="max-width:240px">
+    <div class="lbl">Context menu</div>
+    <div class="menu">
+      <div class="mi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.9 21l1.2-6.8-5-4.9 6.9-1z"/></svg>Add to favourites</div>
+      <div class="mi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h13M3 12h13M3 18h9M17 12v6M14 15h6"/></svg>Add to playlist<span class="arrow">›</span></div>
+      <div class="sep"></div>
+      <div class="mi danger"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14"/></svg>Delete from library</div>
+    </div>
+  </div>
+</body>
+</html>

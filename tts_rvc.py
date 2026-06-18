@@ -1,22 +1,13 @@
 """
-tts_rvc.py — Text-to-speech pipeline: Piper TTS → RVC v2 voice conversion.
+tts_rvc.py — English TTS pipeline: Piper → RVC v2 voice conversion.
 
 Pipeline:
-    text (str)
-        → Piper TTS (CPU, Python API, piper-tts package)
-        → temp WAV in data/temp/  (22 kHz, mono)
-        → RVC v2 inference (GPU, rvc-python)
-        → converted WAV in data/temp/
-        → sounddevice playback
-        → temp files deleted
+    text → Piper TTS (CPU, onnxruntime) → temp WAV
+         → RVC v2 (GPU, assistant.pth, ~1.5 GB VRAM) → converted WAV
+         → sounddevice playback → cleanup
 
-If no RVC model is present, Piper output is played directly (no conversion).
-If CUDA OOM occurs during RVC, falls back to CPU inference.
-If piper-tts package is missing, raises ImportError with install instructions.
-
-VRAM impact:
-    Piper:  0 GB  (CPU / onnxruntime)
-    RVC v2: ~1.5 GB  (fp16, batch_size=1, rmvpe)
+If RVC model missing: plays Piper output directly.
+If CUDA OOM during RVC: falls back to CPU.
 """
 
 from __future__ import annotations
@@ -34,8 +25,6 @@ import config
 from config import (
     PIPER_VOICE_CONFIG,
     PIPER_VOICE_MODEL,
-    KOKORO_MODEL_PATH,
-    KOKORO_VOICES_PATH,
     RVC_BATCH_SIZE,
     RVC_F0_METHOD,
     RVC_F0_UP_KEY,
@@ -65,23 +54,15 @@ class TTSEngine:
 
     def __init__(self) -> None:
         self._rvc = None
-        self._kokoro = None            # kokoro-onnx JP TTS model
         self._rvc_available = False
-        self._piper_voice = None       # English Piper voice (PiperVoice instance)
-        self._openjtalk_ok = False     # whether kokoro JP TTS loaded successfully
-        self._language: str = config.TTS_LANGUAGE  # "ja" or "en"
+        self._rvc_load_attempted = False
+        self._piper_voice = None
         self._piper_ok = self._check_piper()
-        self._openjtalk_ok = self._check_openjtalk()
-        if self._piper_ok or self._openjtalk_ok:
+        # RVC is optional (Settings → Voice). Off by default: no torch import,
+        # no VRAM used. Loaded lazily on first speak() if the user enables it.
+        if self._piper_ok and config.RVC_ENABLED:
             self._try_load_rvc()
-
-    def set_language(self, lang: str) -> None:
-        """Switch TTS language: 'ja' uses kokoro-onnx, 'en' uses Piper."""
-        if lang not in ("ja", "en"):
-            log.warning("Unknown language '%s' — keeping '%s'", lang, self._language)
-            return
-        self._language = lang
-        log.info("TTS language set to '%s'", lang)
+            self._rvc_load_attempted = True
 
     # ─── Setup ────────────────────────────────────────────────────────────────
 
@@ -112,31 +93,15 @@ class TTSEngine:
             log.error("Failed to load Piper EN voice: %s", exc)
             return False
 
-    def _check_openjtalk(self) -> bool:
-        """Load kokoro-onnx model for Japanese TTS (jm_kumo male voice)."""
-        if not KOKORO_MODEL_PATH.exists() or not KOKORO_VOICES_PATH.exists():
-            log.warning(
-                "Kokoro JP model files missing — run python bootstrap.py\n"
-                "  Expected: %s\n  Expected: %s",
-                KOKORO_MODEL_PATH, KOKORO_VOICES_PATH,
-            )
-            return False
-        try:
-            from kokoro_onnx import Kokoro  # type: ignore[import]
-            self._kokoro = Kokoro(str(KOKORO_MODEL_PATH), str(KOKORO_VOICES_PATH))
-            log.info("Kokoro JP TTS ready ✓ (voice=%s)", config.KOKORO_VOICE)
-            return True
-        except Exception as exc:
-            log.warning("Failed to load Kokoro JP TTS: %s", exc)
-            return False
-
     def _try_load_rvc(self) -> None:
-        """Attempt to load RVC v2. Non-fatal if model or package missing."""
-        if not RVC_MODEL_PATH.exists():
+        """Attempt to load RVC v2. Non-fatal if model or package missing. Supports custom model path via config/env."""
+        model_path = getattr(config, "RVC_MODEL_PATH", RVC_MODEL_PATH)
+        index_path = getattr(config, "RVC_INDEX_PATH", RVC_INDEX_PATH)
+        if not model_path.exists():
             log.warning(
                 "RVC model not found at %s — voice conversion disabled. "
                 "Piper output will be played directly.",
-                RVC_MODEL_PATH,
+                model_path,
             )
             return
 
@@ -150,14 +115,14 @@ class TTSEngine:
             return
 
         try:
-            log.info("Loading RVC v2 model (fp16=%s, device=cuda:0)…", RVC_FP16)
+            log.info("Loading RVC v2 model (fp16=%s, device=%s)…", RVC_FP16, config.RVC_DEVICE)
             import torch
 
-            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+            device = config.RVC_DEVICE if torch.cuda.is_available() else "cpu"
             self._rvc = RVCInference(device=device)
             self._rvc.load_model(
-                str(RVC_MODEL_PATH),
-                index_path=str(RVC_INDEX_PATH) if RVC_INDEX_PATH.exists() else "",
+                str(model_path),
+                index_path=str(index_path) if index_path.exists() else "",
             )
             self._rvc_available = True
             log.info("RVC v2 loaded on %s ✓", device)
@@ -169,8 +134,8 @@ class TTSEngine:
                 try:
                     self._rvc = RVCInference(device="cpu")
                     self._rvc.load_model(
-                        str(RVC_MODEL_PATH),
-                        index_path=str(RVC_INDEX_PATH) if RVC_INDEX_PATH.exists() else "",
+                        str(model_path),
+                        index_path=str(index_path) if index_path.exists() else "",
                     )
                     self._rvc_available = True
                     log.info("RVC v2 loaded on CPU (fallback) ✓")
@@ -181,64 +146,74 @@ class TTSEngine:
 
     # ─── Kokoro-ONNX synthesis (Japanese) ────────────────────────────────────
 
-    def _run_openjtalk(self, text: str, output_path: Path) -> None:
-        """
-        Synthesise Japanese text via kokoro-onnx.
-        Pipeline:
-          1. pykakasi: kanji -> hiragana  (prevents espeak reading kanji as Chinese)
-          2. espeak "ja": hiragana -> IPA phonemes
-          3. kokoro-onnx: IPA -> WAV
-        """
-        try:
-            import pykakasi  # type: ignore[import]
-            import espeakng_loader  # type: ignore[import]
-            import phonemizer  # type: ignore[import]
-            from phonemizer.backend.espeak.wrapper import EspeakWrapper
-            from kokoro_onnx.config import DEFAULT_VOCAB
-            import warnings
-
-            # Step 1: kanji -> hiragana so espeak never sees kanji (avoids Chinese phonemes)
-            kks = pykakasi.kakasi()
-            hiragana = "".join(
-                item["hira"] if item["hira"] else item["orig"]
-                for item in kks.convert(text)
-            )
-            log.debug("JP kana: %r", hiragana)
-
-            # Step 2: hiragana -> IPA via espeak
-            EspeakWrapper.set_data_path(espeakng_loader.get_data_path())
-            EspeakWrapper.set_library(espeakng_loader.get_library_path())
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                phonemes_raw = phonemizer.phonemize(
-                    hiragana, language="ja", backend="espeak", with_stress=True
-                )
-            phonemes = "".join(p for p in phonemes_raw if p in DEFAULT_VOCAB)
-            log.debug("JP phonemes: %r", phonemes[:60])
-
-            # Step 3: IPA -> audio via kokoro-onnx
-            samples, sample_rate = self._kokoro.create(
-                phonemes,
-                voice=config.KOKORO_VOICE,
-                speed=config.JP_TTS_SPEED,
-                is_phonemes=True,
-            )
-            sf.write(str(output_path), samples, sample_rate)
-        except Exception as exc:
-            raise RuntimeError(f"Kokoro JP synthesis failed: {exc}") from exc
-
-        # ─── Piper synthesis (English) ────────────────────────────────────────────
+    # ─── Piper synthesis (English) ────────────────────────────────────────────
 
     def _run_piper(self, text: str, output_path: Path) -> None:
         """
-        Synthesise text to a WAV file using the piper-tts Python API.
-        Writes a valid WAV file to output_path.
+        Synthesise text → WAV.
+
+        Fast path  : piper Python API (in-process, zero overhead).
+        Fallback   : piper CLI subprocess — the model runs in its own process so
+                     any ONNX crash there cannot bring down the agent thread.
+                     This handles the known onnxruntime Reshape/zero-dim bug that
+                     hits on certain phoneme sequences (short sentences, question
+                     marks, specific token combinations).
         """
+        import subprocess
+        import sys
+
+        # ── Fast path: Python API ─────────────────────────────────────────────
+        # Open the wave file manually (not as a context manager) so that a
+        # wave.close() error in the finally block cannot mask the real ONNX exc.
+        api_exc: Exception | None = None
+        wav_file = wave.open(str(output_path), "wb")
         try:
-            with wave.open(str(output_path), "wb") as wav_file:
-                self._piper_voice.synthesize_wav(text, wav_file)
+            self._piper_voice.synthesize_wav(text, wav_file)
         except Exception as exc:
-            raise RuntimeError(f"Piper synthesis failed: {exc}") from exc
+            api_exc = exc
+        finally:
+            try:
+                wav_file.close()
+            except Exception:
+                pass  # ignore wave-close errors — they only mask the real exc
+
+        if api_exc is None and output_path.exists() and output_path.stat().st_size > 44:
+            return  # success
+
+        log.warning("Piper Python API failed (%s) — falling back to CLI", api_exc)
+
+        # ── Fallback: piper CLI subprocess ────────────────────────────────────
+        piper_cli = Path(sys.executable).parent / "piper.exe"
+        if not piper_cli.exists():
+            piper_cli = Path(sys.executable).parent / "piper"
+        if not piper_cli.exists():
+            raise RuntimeError(
+                f"Piper Python API failed and piper CLI not found. "
+                f"Original error: {api_exc}"
+            )
+
+        try:
+            proc = subprocess.run(
+                [
+                    str(piper_cli),
+                    "--model",       str(PIPER_VOICE_MODEL),
+                    "--output_file", str(output_path),
+                    "--quiet",
+                ],
+                input=text,
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("piper CLI timed out after 30s")
+
+        if proc.returncode == 0 and output_path.exists() and output_path.stat().st_size > 44:
+            return  # CLI succeeded
+
+        raise RuntimeError(
+            f"piper CLI exited {proc.returncode}: {proc.stderr[:300] or '(no stderr)'}"
+        )
 
     # ─── RVC conversion ───────────────────────────────────────────────────────
 
@@ -295,39 +270,52 @@ class TTSEngine:
         if data.ndim > 1:
             data = data.mean(axis=1)  # stereo → mono
         log.debug("Playing %s (sr=%d, samples=%d)", wav_path.name, sample_rate, len(data))
-        sd.play(data, samplerate=sample_rate)
+        # Route to the user-chosen speaker/headset (Settings → Audio); None = default.
+        device = None
+        try:
+            import config
+            import audio_devices
+            if config.AUDIO_OUTPUT_DEVICE:
+                device = audio_devices.resolve_output_index(config.AUDIO_OUTPUT_DEVICE)
+        except Exception:
+            device = None
+        sd.play(data, samplerate=sample_rate, device=device)
         sd.wait()
 
     # ─── Public interface ─────────────────────────────────────────────────────
 
     def _speak_sync(self, text: str) -> None:
         """Synchronous implementation. Called from async wrapper via executor."""
-        # Select TTS backend: Japanese → kokoro-onnx, English → Piper
-        use_jp = (self._language == "ja" and self._openjtalk_ok)
-        use_en = (self._language == "en" and self._piper_ok)
-        if not use_jp and not use_en:
-            # Fallback: try any available backend
-            if self._openjtalk_ok:
-                use_jp = True
-            elif self._piper_ok:
-                use_en = True
-            else:
-                log.error("TTS not available — download Kokoro models (JP) or install piper-tts (EN)")
-                return
+        if not self._piper_ok:
+            log.error("Piper TTS not available — run: pip install piper-tts")
+            return
+
+        # Live settings checks so GUI toggles apply without a restart
+        import settings as user_settings
+        if not user_settings.get("voice.tts_enabled", True):
+            return
+        rvc_wanted = bool(user_settings.get("voice.rvc_enabled", False))
+        if rvc_wanted and not self._rvc_load_attempted:
+            self._try_load_rvc()
+            self._rvc_load_attempted = True
+
+        # Strip ACTION lines — never speak them
+        import re as _re
+        text = _re.sub(r'ACTION:\s*\S+.*', '', text, flags=_re.IGNORECASE).strip()
+        # Piper ONNX crashes on empty / punct-only input (Reshape zero-dim bug)
+        if not _re.search(r'[a-zA-Z0-9]', text):
+            return
 
         uid = uuid.uuid4().hex[:8]
         piper_out = TEMP_DIR / f"piper_{uid}.wav"
         rvc_out   = TEMP_DIR / f"rvc_{uid}.wav"
 
         try:
-            # 1. Synthesise with selected backend
-            if use_jp:
-                self._run_openjtalk(text, piper_out)
-            else:
-                self._run_piper(text, piper_out)
+            # 1. Synthesise with Piper
+            self._run_piper(text, piper_out)
 
-            # 2. Voice-convert with RVC if available
-            if self._rvc_available:
+            # 2. Voice-convert with RVC only when enabled AND loaded
+            if rvc_wanted and self._rvc_available:
                 try:
                     self._run_rvc(piper_out, rvc_out)
                     playback_path = rvc_out
@@ -372,20 +360,10 @@ if __name__ == "__main__":
 
     engine = TTSEngine()
 
-    if config.TTS_LANGUAGE == "ja":
-        # Iconic Gojo Satoru lines
-        test_phrases = [
-            "やばいな、信が最強なんだよね。",          # Yabai na, ore ga saikyou nanda yo ne.
-            "はい、ふつうに最強。",                     # Hai, futsuu ni saikyou.
-            "この世界はこんなに面白いのか。",           # Kono sekai wa konnani omoshiroi no ka.
-            "術式反転、無限。",                         # Jutsushiki hanten, mugen.
-            "天上天下、唯我独尊。",                     # Ten jou ten ge, yui ga doku son.
-        ]
-    else:
-        test_phrases = [
-            "Hello. I am your AI companion.",
-            "All processing happens on this machine — no cloud, no latency.",
-        ]
+    test_phrases = [
+        "Hello. I am your AI companion.",
+        "All processing happens on this machine — no cloud, no latency.",
+    ]
 
     async def _test() -> None:
         for phrase in test_phrases:

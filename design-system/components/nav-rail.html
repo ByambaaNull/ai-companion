@@ -1,0 +1,59 @@
+<!-- @dsCard group="Navigation" name="App rail" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>App rail · AI Companion</title>
+<style>
+  :root{
+    --bg:#06070c;
+    --bg-grad:
+      radial-gradient(700px 460px at 12% -12%, rgba(124,108,255,.28), transparent 60%),
+      radial-gradient(620px 460px at 104% 8%, rgba(196,98,234,.20), transparent 58%);
+    --rail:rgba(18,20,32,.55);
+    --surface-2:rgba(255,255,255,.05);
+    --border:rgba(255,255,255,.10);
+    --border-strong:rgba(255,255,255,.18);
+    --text:#eceefb; --text-2:#a8b0c9; --good:#4ade80;
+    --accent:#8b8cff; --accent-soft:rgba(139,140,255,.16);
+    --accent-grad:linear-gradient(135deg,#8b8cff,#c062ea);
+    --glow:0 10px 34px rgba(139,140,255,.42);
+    --blur:saturate(150%) blur(18px);
+    --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);color:var(--text);background:var(--bg-grad),var(--bg);
+       background-attachment:fixed;min-height:100vh;display:flex;gap:26px;padding:30px}
+  .rail{width:64px;border-radius:18px;background:var(--rail);border:1px solid var(--border);
+        backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+        display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;
+        box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .logo{width:40px;height:40px;border-radius:12px;background:var(--accent-grad);color:#fff;
+        display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;
+        box-shadow:var(--glow);margin-bottom:10px}
+  .nav{width:44px;height:44px;border-radius:11px;color:var(--text-2);display:flex;
+       align-items:center;justify-content:center;cursor:pointer;border:1px solid transparent;transition:.15s}
+  .nav:hover{background:var(--surface-2);color:var(--text)}
+  .nav.active{background:var(--accent-soft);color:var(--accent);box-shadow:inset 0 0 0 1px var(--border-strong)}
+  .spacer{flex:1}
+  .dot{width:11px;height:11px;border-radius:50%;background:var(--good);box-shadow:0 0 12px var(--good);margin:8px 0}
+  .note{align-self:center;color:var(--text-2);font-size:13px;max-width:280px;line-height:1.6}
+  .note b{color:var(--text)}
+  svg{display:block}
+</style>
+</head>
+<body>
+  <nav class="rail">
+    <div class="logo">A</div>
+    <div class="nav active" title="Home"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></div>
+    <div class="nav" title="Music"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></div>
+    <div class="nav" title="Activity"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div>
+    <div class="nav" title="Automations"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></div>
+    <div class="spacer"></div>
+    <div class="dot" title="Online"></div>
+    <div class="nav" title="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+  </nav>
+  <div class="note">The 64&nbsp;px <b>app rail</b> is frosted glass over the ambient backdrop. Active items get an accent-soft fill plus a hairline inner ring; the status dot glows in real time (online / thinking / listening / speaking).</div>
+</body>
+</html>

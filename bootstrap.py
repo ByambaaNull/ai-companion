@@ -106,45 +106,16 @@ def check_python_version() -> None:
     log.info("Python %s.%s ✓", sys.version_info.major, sys.version_info.minor)
 
 
-def check_ollama(pull: bool = True, skip_check: bool = False) -> None:
-    """Verify Ollama is running and the model is available."""
-    if skip_check:
-        log.info("Skipping Ollama check (--skip-ollama-pull passed).")
-        return
-
-    if not _check_command("ollama"):
-        log.error(
-            "Ollama not found on PATH. Install from https://ollama.ai and re-run.\n"
-            "  After installing, open a NEW terminal and re-run bootstrap.py."
-        )
-        sys.exit(1)
-
-    try:
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True, text=True, timeout=10
-        )
-        if config.OLLAMA_MODEL in result.stdout:
-            log.info("Ollama model %s ✓", config.OLLAMA_MODEL)
-            return
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        log.warning("Ollama not responding — is the server running? (ollama serve)")
-
-    if pull:
-        log.info("Pulling Ollama model: %s (requires internet this once)", config.OLLAMA_MODEL)
-        try:
-            subprocess.run(
-                ["ollama", "pull", config.OLLAMA_MODEL],
-                check=True,
-                timeout=600,
-            )
-            log.info("Ollama model %s pulled ✓", config.OLLAMA_MODEL)
-        except subprocess.CalledProcessError as exc:
-            log.error("ollama pull failed: %s", exc)
-            sys.exit(1)
+def check_github_api_key() -> None:
+    """Warn if GITHUB_TOKEN is not set — the LLM and vision features won't work without it."""
+    if config.GITHUB_API_KEY:
+        log.info("GitHub API key ✓ (model: %s)", config.GITHUB_GPT_MODEL)
     else:
-        log.warning("Ollama model %s not found. Run: ollama pull %s",
-                    config.OLLAMA_MODEL, config.OLLAMA_MODEL)
+        log.warning(
+            "GITHUB_TOKEN not set — LLM, memory, and vision features will not work.\n"
+            "  Create a .env file in the project root with:\n"
+            "  GITHUB_TOKEN=ghp_..."
+        )
 
 
 def check_mpv() -> None:
@@ -341,7 +312,7 @@ def check_favourites() -> None:
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def run_bootstrap(skip_ollama_pull: bool = False) -> None:
+def run_bootstrap() -> None:
     setup_logging()
     log.info("=" * 60)
     log.info("AI Companion Bootstrap")
@@ -349,14 +320,17 @@ def run_bootstrap(skip_ollama_pull: bool = False) -> None:
 
     check_python_version()
     check_directories()
-    check_ollama(pull=not skip_ollama_pull, skip_check=skip_ollama_pull)
+    check_github_api_key()
     check_mpv()
-    download_rvc_prereqs()
     check_piper()
     check_piper_voice()
     check_kokoro_models()
-    check_rvc_model()
-    check_rvc_python()
+    if config.RVC_ENABLED:
+        download_rvc_prereqs()
+        check_rvc_model()
+        check_rvc_python()
+    else:
+        log.info("RVC voice conversion disabled (Settings → Voice) — skipping RVC setup.")
     check_favourites()
 
     log.info("=" * 60)
@@ -366,10 +340,5 @@ def run_bootstrap(skip_ollama_pull: bool = False) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AI Companion first-run setup")
-    parser.add_argument(
-        "--skip-ollama-pull",
-        action="store_true",
-        help="Don't attempt to pull Ollama model (use if already pulled)",
-    )
     args = parser.parse_args()
-    run_bootstrap(skip_ollama_pull=args.skip_ollama_pull)
+    run_bootstrap()

@@ -22,8 +22,10 @@ Usage:
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
+import httpx
 from mem0 import Memory
 
 import config
@@ -42,6 +44,7 @@ class MemoryManager:
         log.info("Initialising memory system (ChromaDB at %s)", config.MEMORY_DB_DIR)
         # Always pass explicit config — never rely on mem0 defaults (hits OpenAI)
         self._mem = Memory.from_config(MEM0_CONFIG)
+        self._write_lock = threading.Lock()  # serialise concurrent DB writes
         log.info("Memory system ready ✓")
 
     # ─── Write ────────────────────────────────────────────────────────────────
@@ -50,20 +53,121 @@ class MemoryManager:
         """
         Extract and store facts from text.
 
-        mem0 uses the configured LLM to distil facts from the raw text,
-        then embeds and stores them in ChromaDB.
-
-        Returns the list of stored memory records.
+        Uses a compact self-managed LLM call (~300 tokens total) instead of
+        mem0's built-in extraction (~7 000-token system prompt) to stay within
+        the 8 000-token per-request limit on GitHub Models.
         """
         log.debug("Memory.add | user=%s | text=%.80s…", user_id, text)
-        try:
-            result = self._mem.add(text, user_id=user_id)
-            stored = result.get("results", []) if isinstance(result, dict) else result
-            log.debug("Stored %d memory record(s)", len(stored))
-            return stored
-        except Exception as exc:
-            log.error("memory.add failed: %s", exc)
+        MAX_CHARS = 600
+        if len(text) > MAX_CHARS:
+            text = text[:MAX_CHARS]
+        facts = self._extract_facts(text)
+        if not facts:
+            log.debug("Stored 0 memory record(s) (nothing memorable)")
             return []
+        stored = []
+        for fact in facts:
+            with self._write_lock:
+                record = self._direct_store(fact, user_id)
+            if record:
+                stored.append(record)
+        log.debug("Stored %d memory record(s)", len(stored))
+        return stored
+
+    def _extract_facts(self, text: str) -> list[str]:
+        """
+        Short-prompt LLM extraction (~300 total tokens, never triggers 413).
+        Returns compact fact strings; falls back to raw snippet on failure.
+        """
+        if not config.LLM_API_KEY:
+            return [text[:200]] if len(text) > 10 else []
+        try:
+            resp = httpx.post(
+                config.LLM_API_URL,
+                json={
+                    "model": config.LLM_MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "Extract memorable facts from this text as short statements. "
+                                "Return one fact per line. "
+                                "Return NONE if nothing is worth remembering."
+                            ),
+                        },
+                        {"role": "user", "content": text},
+                    ],
+                    "max_tokens": 120,
+                    "temperature": 0.1,
+                    "stream": False,
+                },
+                headers={
+                    "Authorization": f"Bearer {config.LLM_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            if raw.upper().startswith("NONE") and len(raw) < 10:
+                return []
+            return [
+                f.strip()
+                for f in raw.splitlines()
+                if f.strip() and f.strip().upper() != "NONE"
+            ]
+        except Exception as exc:
+            try:
+                body = getattr(getattr(exc, "response", None), "text", "")[:200]
+            except Exception:
+                body = ""
+            log.warning("_extract_facts LLM call failed: %s%s — storing raw snippet",
+                        exc, f" — {body}" if body else "")
+            return [text[:200]] if len(text) > 10 else []
+
+    def _direct_store(self, text: str, user_id: str) -> dict | None:
+        """
+        Embed and insert one fact directly, bypassing mem0's LLM extraction step.
+
+        Path 1: mem0's internal embedding_model + vector_store (preferred).
+        Path 2: direct chromadb write with sentence-transformers (fallback).
+        """
+        import uuid as _uuid
+        doc_id = str(_uuid.uuid4())
+        payload = {"memory": text, "user_id": user_id}
+
+        # Path 1 — mem0 internals
+        try:
+            embedding = self._mem.embedding_model.embed(text)
+            self._mem.vector_store.insert(
+                vectors=[embedding],
+                payloads=[payload],
+                ids=[doc_id],
+            )
+            return {"id": doc_id, "memory": text}
+        except AttributeError:
+            pass  # mem0 internals not exposed — fall through to direct ChromaDB
+        except Exception as exc:
+            log.debug("_direct_store mem0 path failed: %s", exc)
+
+        # Path 2 — direct ChromaDB with sentence-transformers
+        try:
+            import chromadb
+            from chromadb.utils.embedding_functions import (
+                SentenceTransformerEmbeddingFunction,
+            )
+            ef = SentenceTransformerEmbeddingFunction(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+            client = chromadb.PersistentClient(path=str(config.MEMORY_DB_DIR))
+            col = client.get_or_create_collection(
+                "companion_memory", embedding_function=ef
+            )
+            col.add(ids=[doc_id], documents=[text], metadatas=[payload])
+            return {"id": doc_id, "memory": text}
+        except Exception as exc:
+            log.error("_direct_store chromadb path failed: %s", exc)
+            return None
 
     def update(self, memory_id: str, new_text: str) -> None:
         """Update an existing memory record by ID."""
@@ -105,7 +209,11 @@ class MemoryManager:
         """
         log.debug("Memory.search | user=%s | query=%.80s…", user_id, query)
         try:
-            results = self._mem.search(query, user_id=user_id, limit=limit)
+            results = self._mem.search(
+                query,
+                filters={"user_id": user_id},
+                limit=limit,
+            )
             records = results.get("results", []) if isinstance(results, dict) else results
             log.debug("Retrieved %d memory record(s)", len(records))
             return records
@@ -116,7 +224,9 @@ class MemoryManager:
     def get_all(self, user_id: str = config.USER_ID) -> list[dict[str, Any]]:
         """Return every stored memory for a user."""
         try:
-            results = self._mem.get_all(user_id=user_id)
+            # mem0 ≥0.1: scoping is via filters=, not a top-level user_id kwarg
+            # (the old form raised "Top-level entity parameters ... not supported").
+            results = self._mem.get_all(filters={"user_id": user_id})
             return results.get("results", []) if isinstance(results, dict) else results
         except Exception as exc:
             log.error("memory.get_all failed: %s", exc)

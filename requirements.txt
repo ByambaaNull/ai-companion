@@ -13,9 +13,20 @@
 #
 # =============================================================================
 
+# ─── Desktop GUI — PyQt5 + QtWebEngine (renders ui.html, the whole interface) ─
+# Required to launch assistant_gui.py. On Apple Silicon Macs, PyQt5 wheels may
+# need Rosetta; if pip can't find a wheel, see the README (PyQt6 note).
+PyQt5>=5.15.9
+PyQtWebEngine>=5.15.6
+
 # ─── Core async / HTTP ────────────────────────────────────────────────────────
 httpx>=0.27.0
 aiofiles>=23.2.1
+python-dotenv>=1.0.0     # loads .env file into environment at startup
+
+# ─── Browser automation (social messaging — Facebook, Instagram) ──────────────
+# After pip install, also run:  playwright install chromium
+playwright>=1.44.0
 
 # ─── LLM — Ollama Python client ──────────────────────────────────────────────
 ollama>=0.3.3
@@ -33,28 +44,23 @@ keyboard>=0.13.5
 # ─── Audio I/O — sounddevice (bundles PortAudio DLLs on Windows) ─────────────
 sounddevice>=0.4.7
 soundfile>=0.12.1
-numpy>=1.26.4
+# numpy must stay < 2: torch 2.3.1 is compiled against numpy 1.x, and numpy 2.x
+# triggers "Failed to initialize NumPy: _ARRAY_API not found" (breaks Piper TTS +
+# memory embeddings). 1.26.x is the verified-working line (also satisfies chromadb
+# / sentence-transformers, which need >= 1.24 — the old <=1.23.5 pin conflicted).
+numpy>=1.26.0,<2
 
 # ─── TTS — Piper (Python package, CPU-only, 0 VRAM) ─────────────────────────
 # piper-tts is a pip package (GPL-3.0). Install like any other package.
 # Voice models are downloaded separately via:
 #   python -m piper.download_voices en_US-lessac-medium
 # OR automatically by: python bootstrap.py
+
 piper-tts>=1.4.2
-onnxruntime>=1.18.0     # CPU inference backend for Piper (no VRAM cost)
+onnxruntime>=1.19.0     # CPU inference backend for Piper + rembg (no VRAM cost)
 
-# ─── Japanese TTS — kokoro-onnx ──────────────────────────────────────────────
-# Pure-Python ONNX-based TTS with a male Japanese voice (jm_kumo).
-# Uses espeakng_loader (bundled DLL, no system install needed) for JP G2P.
-# Model files (~115 MB) are downloaded by bootstrap.py to models/kokoro/*.
-kokoro-onnx==0.4.7
-pykakasi>=2.2.1          # kanji -> hiragana pre-processing (prevents espeak reading kanji as Chinese)
 
-# ─── RVC v2 voice conversion ──────────────────────────────────────────────────
-# rvc-python provides a clean Python API around RVC v2
-rvc-python>=0.1.5
-# Dependencies pulled by rvc-python: fairseq, torchcrepe, praat-parselmouth, etc.
-# If rvc-python is unavailable, see bootstrap.py for repo-clone fallback.
+
 
 # ─── Memory — mem0 + ChromaDB + sentence-transformers ────────────────────────
 # CRITICAL: always pass MEM0_CONFIG from config.py — never use default (hits OpenAI)
@@ -72,15 +78,52 @@ psutil>=6.0.0
 mss>=9.0.1               # fast cross-platform screen capture
 
 # ─── Music — yt-dlp (downloader) ─────────────────────────────────────────────
-# mpv must be installed separately and on PATH:
-#   https://mpv.io/installation/  (Windows: choco install mpv  OR  scoop install mpv)
+# Offline music: downloads YouTube audio as MP3 and plays it locally.
+# Two external tools must be installed separately and be on PATH:
+#   • ffmpeg — required to transcode downloads to MP3
+#       Windows: winget install Gyan.FFmpeg   (or: choco install ffmpeg)
+#   • mpv    — playback engine with pause/seek/volume IPC (ffplay is the fallback)
+#       https://mpv.io/installation/  (Windows: winget install mpv  OR  scoop install mpv)
 yt-dlp>=2024.8.6
+# Reads tags (title/artist/duration) when importing an existing local music
+# folder offline (import_music). Optional — falls back to filenames if absent.
+mutagen>=1.47.0
 
-# ─── mpv IPC named pipe on Windows ───────────────────────────────────────────
-pywin32>=306
+# ─── mpv IPC named pipe on Windows (Windows-only — skipped on macOS/Linux) ───
+pywin32>=306; sys_platform == "win32"
 
 # ─── PyTorch (declared here for reference — install via Step 1 above) ─────────
 # Your driver: CUDA 13.2 — supports cu124 wheels and above
 # torch>=2.4 required by transformers (sentence-transformers / mem0 embedder)
 #   pip install torch==2.6.0+cu124 torchaudio==2.6.0+cu124 --extra-index-url https://download.pytorch.org/whl/cu124
 # torch>=2.6.0    # installed with CUDA build via --extra-index-url
+
+# ─── Video downloader (choose your resolution) ───────────────────────────────
+# Uses the same yt-dlp + ffmpeg already required by Music above. yt-dlp grabs the
+# chosen video stream and ffmpeg merges the matching audio into an MP4. No extra
+# package is needed beyond yt-dlp (declared above) and ffmpeg on PATH.
+
+# ─── Background eraser (LOCAL, FREE — no paid website) ───────────────────────
+# rembg removes image backgrounds on-device with an ONNX model (no API/login).
+# The u2net model (~176 MB) downloads once on first use, then runs fully offline.
+# OPTIONAL: the app shows a clear install hint if it's missing.
+#   pip install "rembg<2.0.66"
+# VERSION PIN — important: rembg >= 2.0.66 hard-requires numpy >= 2.3, which is
+# INCOMPATIBLE with this project's torch 2.3.1+cu121 build (compiled for numpy 1.x
+# → "Failed to initialize NumPy: _ARRAY_API not found", breaking memory embeddings
+# AND Piper TTS). rembg 2.0.65 works on numpy 1.26.x. This machine runs:
+#   numpy 1.26.4 · onnxruntime 1.27.0 · rembg 2.0.65   (verified working)
+# onnxruntime was bumped to 1.19+ (1.27) so it tolerates both numpy 1.x and 2.x.
+rembg>=2.0.50,<2.0.66    # optional — background removal (imported lazily)
+
+# ── Productivity pack (office / study automations) ──────────────────────────
+pypdf>=4.0.0             # PDF text extraction for summarize_doc
+python-docx>=1.1.0       # DOCX text extraction for summarize_doc
+
+# ── Toolbox Wave 2 (PDF / QR / doc-chat / upscaler) ─────────────────────────
+# All local & free. doc-chat reuses chromadb + sentence-transformers (above);
+# the upscaler reuses onnxruntime (above) and downloads a Swin2SR x4 model on
+# first use. pyzbar bundles the zbar DLLs in its Windows wheel (no extra install).
+PyMuPDF>=1.24.0          # fitz — PDF render/compress/text + doc-chat extraction
+qrcode[pil]>=7.4         # QR code generation (qr_tools.generate)
+pyzbar>=0.1.9            # QR / barcode scanning (qr_tools.scan)

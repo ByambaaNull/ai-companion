@@ -1,0 +1,112 @@
+<!-- @dsCard group="Components" name="Music player" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Player · AI Companion</title>
+<style>
+  :root{
+    --bg:#06070c;
+    --bg-grad:
+      radial-gradient(700px 460px at 12% -12%, rgba(124,108,255,.28), transparent 60%),
+      radial-gradient(620px 460px at 104% 8%, rgba(196,98,234,.20), transparent 58%);
+    --surface:rgba(30,33,48,.55);
+    --surface-2:rgba(255,255,255,.05);
+    --surface-3:rgba(255,255,255,.12);
+    --border:rgba(255,255,255,.10);
+    --text:#eceefb; --text-2:#a8b0c9; --muted:#6f7796;
+    --accent:#8b8cff; --accent-soft:rgba(139,140,255,.16);
+    --accent-grad:linear-gradient(135deg,#8b8cff,#c062ea);
+    --glow:0 10px 34px rgba(139,140,255,.42);
+    --blur:saturate(150%) blur(18px);
+    --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);color:var(--text);background:var(--bg-grad),var(--bg);
+       background-attachment:fixed;min-height:100vh;padding:30px}
+  h1{font-size:18px;font-weight:650;margin-bottom:16px}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:18px 0 10px}
+  .tracks{backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);background:var(--surface);
+          border:1px solid var(--border);border-radius:16px;padding:8px;box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .track{display:grid;grid-template-columns:28px 1fr auto auto;gap:12px;align-items:center;
+         padding:9px 11px;border-radius:10px;cursor:pointer}
+  .track:hover{background:var(--surface-2)}
+  .track.playing{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent-soft)}
+  .idx{color:var(--muted);font-size:12px;text-align:center}
+  .track.playing .idx{color:var(--accent)}
+  .tt{font-size:13.5px;font-weight:550}
+  .track.playing .tt{color:var(--accent)}
+  .ta{font-size:12px;color:var(--muted);margin-top:1px}
+  .dur{color:var(--muted);font-size:12px}
+  .heart{color:var(--accent)}
+  .player{margin-top:16px;backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+          background:var(--surface);border:1px solid var(--border);border-radius:16px;
+          display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;padding:14px 18px;
+          box-shadow:0 16px 44px rgba(0,0,0,.5)}
+  .now{display:flex;align-items:center;gap:12px;min-width:0}
+  .cover{width:46px;height:46px;border-radius:10px;background:var(--accent-soft);color:var(--accent);
+         display:flex;align-items:center;justify-content:center;font-weight:650;font-size:18px;
+         box-shadow:inset 0 0 0 1px var(--border)}
+  .ptitle{font-size:13.5px;font-weight:600}
+  .partist{font-size:12px;color:var(--muted)}
+  .center{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .transport{display:flex;align-items:center;gap:8px}
+  .pbtn{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        color:var(--text-2);cursor:pointer}
+  .pbtn:hover{background:var(--surface-2);color:var(--text)}
+  .pbtn.active{color:var(--accent)}
+  .play{width:40px;height:40px;border-radius:50%;background:var(--accent-grad);color:#fff;
+        display:flex;align-items:center;justify-content:center;box-shadow:var(--glow);cursor:pointer}
+  .progress{display:flex;align-items:center;gap:9px;width:340px}
+  .time{font-size:11px;color:var(--muted);min-width:32px}
+  .seek{flex:1;height:5px;border-radius:999px;background:var(--surface-3);position:relative}
+  .seek .fill{position:absolute;left:0;top:0;bottom:0;width:42%;border-radius:999px;background:var(--accent-grad)}
+  .right{display:flex;align-items:center;justify-content:flex-end;gap:9px;color:var(--muted)}
+  .vol{width:90px;height:5px;border-radius:999px;background:var(--surface-3);position:relative}
+  .vol .fill{position:absolute;left:0;top:0;bottom:0;width:72%;border-radius:999px;background:var(--text-2)}
+  svg{display:block}
+</style>
+</head>
+<body>
+  <h1>Music player</h1>
+
+  <div class="lbl">Track list</div>
+  <div class="tracks">
+    <div class="track playing">
+      <div class="idx">1</div>
+      <div><div class="tt">Weightless</div><div class="ta">Marconi Union</div></div>
+      <div class="heart"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg></div>
+      <div class="dur">6:12</div>
+    </div>
+    <div class="track">
+      <div class="idx">2</div>
+      <div><div class="tt">Saturn</div><div class="ta">Sleeping at Last</div></div>
+      <div style="color:var(--muted)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg></div>
+      <div class="dur">4:35</div>
+    </div>
+  </div>
+
+  <div class="lbl">Now-playing bar</div>
+  <div class="player">
+    <div class="now">
+      <div class="cover">W</div>
+      <div><div class="ptitle">Weightless</div><div class="partist">Marconi Union</div></div>
+    </div>
+    <div class="center">
+      <div class="transport">
+        <div class="pbtn active" title="Shuffle"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></div>
+        <div class="pbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></div>
+        <div class="play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></div>
+        <div class="pbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zm-2 6L5.5 6v12z"/></svg></div>
+        <div class="pbtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+      </div>
+      <div class="progress"><span class="time">2:35</span><div class="seek"><div class="fill"></div></div><span class="time">6:12</span></div>
+    </div>
+    <div class="right">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
+      <div class="vol"><div class="fill"></div></div>
+    </div>
+  </div>
+</body>
+</html>
