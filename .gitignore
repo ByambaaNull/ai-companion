@@ -27,6 +27,8 @@ build_pyi/
 dist/
 .prebuild_backup/
 *.spec.bak
+# Bundled CLI tools (ffmpeg/mpv) if dropped at the source root for a dev run.
+/bin/
 
 # ─── Large model binaries (downloaded / placed locally) ──────────────────────
 # NOTE: .gitignore has no inline comments — keep patterns on their own lines.

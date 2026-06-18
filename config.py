@@ -39,6 +39,14 @@ if getattr(sys, "frozen", False):
 else:
     ROOT: Path = Path(__file__).parent.resolve()
 
+# Bundled command-line tools (ffmpeg / mpv) ship in bin/ next to the exe so the
+# packaged app is self-contained. Prepend it to PATH so subprocess calls AND
+# yt-dlp (which spawns ffmpeg itself) find the bundled binaries even when the end
+# user has nothing installed. Harmless when bin/ is absent (run-from-source).
+_BIN_DIR: Path = ROOT / "bin"
+if _BIN_DIR.is_dir():
+    os.environ["PATH"] = str(_BIN_DIR) + os.pathsep + os.environ.get("PATH", "")
+
 # ─── Directory layout ─────────────────────────────────────────────────────────
 MODELS_DIR:     Path = ROOT / "models"
 RVC_MODEL_DIR:  Path = MODELS_DIR / "rvc"
@@ -191,11 +199,15 @@ KOKORO_VOICES_PATH: Path = KOKORO_MODEL_DIR / "voices-v1.0.bin"
 
 # ─── Executable discovery ────────────────────────────────────────────────────
 def _find_exe(env_var: str, *which_names: str, fallback: str = "") -> str:
-    """Resolve an executable: env-var override → PATH → fallback string."""
+    """Resolve an executable: env-var override → bundled bin/ → PATH → fallback."""
     override = os.getenv(env_var, "")
     if override:
         return override
-    for name in which_names:
+    for name in which_names:                 # prefer a bundled binary if present
+        cand = _BIN_DIR / name
+        if cand.is_file():
+            return str(cand)
+    for name in which_names:                 # otherwise fall back to PATH
         found = shutil.which(name)
         if found:
             return found
@@ -217,7 +229,7 @@ MPV_EXECUTABLE:   str = _find_exe(
     fallback=r"C:\Program Files\MPV Player\mpv.exe",
 )
 FFPLAY_EXECUTABLE: str = _find_exe(
-    "FFPLAY_EXECUTABLE", "ffplay",
+    "FFPLAY_EXECUTABLE", "ffplay", "ffplay.exe",
     fallback="",  # no universal fallback; optional
 )
 # ffmpeg powers the media toolkit + subtitle generation (same binary yt-dlp uses).
