@@ -64,6 +64,9 @@ run_assistant.bat
 
 The app reads `ui.html` directly, so UI edits show on the next launch.
 
+**📖 For the packaged `.exe`, the Desktop shortcut, and every launch option, see
+the dedicated [Launch Guide → LAUNCH.md](LAUNCH.md).**
+
 ## Building a standalone Windows app (optional)
 
 ```bat

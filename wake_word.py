@@ -21,7 +21,17 @@ import logging
 import sys
 import threading
 
-import keyboard
+# `keyboard` registers OS-global hotkeys. It raises at IMPORT time on Linux
+# without root (and needs accessibility permissions on macOS), so import it
+# defensively — otherwise it would take down the whole agent pipeline on
+# non-Windows machines. When it's unavailable, wake-word activation is simply
+# disabled and the rest of the assistant keeps working.
+try:
+    import keyboard
+    _KBD_ERROR: Exception | None = None
+except Exception as _exc:  # pragma: no cover - platform dependent
+    keyboard = None  # type: ignore[assignment]
+    _KBD_ERROR = _exc
 
 import config
 
@@ -41,17 +51,36 @@ class HotkeyActivator:
     def __init__(self) -> None:
         self._activate_event = threading.Event()
         self._quit_event = threading.Event()
+        self.available = False
 
-        keyboard.add_hotkey(
-            config.HOTKEY_ACTIVATE,
-            self._on_activate,
-            suppress=False,
-        )
-        keyboard.add_hotkey(
-            config.HOTKEY_QUIT,
-            self._on_quit,
-            suppress=False,
-        )
+        if keyboard is None:
+            log.warning(
+                "Global hotkeys unavailable on this platform (%s) — wake-word "
+                "activation is disabled; the rest of the assistant works normally.",
+                _KBD_ERROR,
+            )
+            return
+
+        try:
+            keyboard.add_hotkey(
+                config.HOTKEY_ACTIVATE,
+                self._on_activate,
+                suppress=False,
+            )
+            keyboard.add_hotkey(
+                config.HOTKEY_QUIT,
+                self._on_quit,
+                suppress=False,
+            )
+        except Exception as exc:
+            log.warning(
+                "Could not register global hotkeys (%s) — wake-word activation "
+                "disabled; the rest of the assistant works normally.",
+                exc,
+            )
+            return
+
+        self.available = True
         log.info(
             "Hotkey activator ready ✓  activate=%r  quit=%r",
             config.HOTKEY_ACTIVATE,
